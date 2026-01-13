@@ -83,7 +83,6 @@
 
         <!-- Active Study Session -->
         <section id="study-section" class="hidden space-y-6">
-            <!-- Simplified Header (No Timer) -->
             <div class="glass-card p-6 rounded-[32px] border-b-4 border-indigo-500 flex justify-between items-center">
                 <div>
                     <span id="current-subject-badge" class="px-5 py-1.5 bg-indigo-600 text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em]">EM EXECUÇÃO</span>
@@ -147,11 +146,23 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        // Proteção para variáveis de ambiente do Canvas (corrige erro em hospedagem externa)
+        let firebaseConfig = {};
+        try {
+            if (typeof __firebase_config !== 'undefined') {
+                firebaseConfig = JSON.parse(__firebase_config);
+            }
+        } catch (e) { console.warn("Firebase config não disponível."); }
+
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'simulado-combat-v1';
+        
+        // Inicialização condicional do Firebase
+        let app, auth, db;
+        if (firebaseConfig.apiKey) {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        }
 
         let user = null;
         let globalStartTime = null;
@@ -160,26 +171,35 @@
         let sessionSubjects = [];
         let userDefinedSubjects = [];
         
-        // Cumulative stats
         let totalCorrect = 0;
         let totalQuestionsAttempted = 0;
         let currentSubjAnswered = 0;
 
-        // API Key configurada conforme solicitado
         const apiKey = "AIzaSyBkPMKVAI_Jh-ZJ6h4AEUuP9W990ItqLxk"; 
 
-        // Auth init
+        // Auth init com proteção
         const initAuth = async () => {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
-            }
+            if (!auth) return;
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) { console.error("Erro na autenticação", e); }
         };
-        onAuthStateChanged(auth, u => { user = u; });
-        initAuth();
 
-        // UI Management
+        if (auth) {
+            onAuthStateChanged(auth, u => { 
+                user = u; 
+                if(user) document.getElementById('user-status').textContent = "Sessão Conectada";
+            });
+            initAuth();
+        } else {
+            document.getElementById('user-status').textContent = "Modo Local";
+        }
+
+        // Funções da UI (agora protegidas contra erro de carregamento)
         document.getElementById('add-subject-btn').addEventListener('click', () => {
             const name = document.getElementById('subject-dropdown').value;
             const qCount = parseInt(document.getElementById('new-subject-qcount').value) || 5;
@@ -196,6 +216,11 @@
             }
         });
 
+        window.removeSubject = (idx) => { 
+            userDefinedSubjects.splice(idx, 1); 
+            renderSubjectBadges(); 
+        };
+
         function renderSubjectBadges() {
             const list = document.getElementById('subjects-list');
             list.innerHTML = '';
@@ -209,23 +234,18 @@
                 list.appendChild(div);
             });
         }
-        window.removeSubject = (idx) => { userDefinedSubjects.splice(idx, 1); renderSubjectBadges(); };
 
-        // Session Control
         document.getElementById('start-session-btn').addEventListener('click', () => {
             if (userDefinedSubjects.length === 0) {
                 alert("Adicione ao menos uma disciplina para começar.");
                 return;
             }
-
             sessionSubjects = [...userDefinedSubjects];
             globalStartTime = Date.now();
             totalCorrect = 0;
             totalQuestionsAttempted = 0;
-
             document.getElementById('setup-section').classList.add('hidden');
             document.getElementById('study-section').classList.remove('hidden');
-            
             currentSubjectIndex = 0;
             startNextSubject();
         });
@@ -235,7 +255,6 @@
             document.getElementById('current-task-title').textContent = subj.name;
             document.getElementById('ia-subject-label').textContent = subj.name;
             document.getElementById('next-subject-flow').classList.add('hidden');
-            
             currentSubjAnswered = 0;
             fetchAIQuestions(subj.name, subj.qCount);
         }
@@ -256,7 +275,10 @@
                     })
                 });
                 const data = await response.json();
-                const qs = JSON.parse(data.candidates[0].content.parts[0].text);
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if(!text) throw new Error("Resposta inválida da IA.");
+                
+                const qs = JSON.parse(text);
                 loading.classList.add('hidden');
                 
                 qs.forEach((q, i) => {
@@ -276,7 +298,7 @@
                 });
             } catch (e) {
                 loading.classList.add('hidden');
-                container.innerHTML = `<p class="p-8 text-center text-red-500 font-bold">Falha ao carregar questões. Tente recarregar.</p>`;
+                container.innerHTML = `<p class="p-8 text-center text-red-500 font-bold">Falha ao carregar questões. Verifique a chave da API.</p>`;
             }
         }
 
@@ -284,21 +306,17 @@
             const res = document.getElementById(`res-${i}`);
             const btnT = document.getElementById(`q-${i}-t`);
             const btnF = document.getElementById(`q-${i}-f`);
-            
             if (res.classList.contains('hidden')) {
                 res.classList.remove('hidden');
                 btnT.disabled = btnF.disabled = true;
-                
                 totalQuestionsAttempted++;
                 currentSubjAnswered++;
-                
                 if (userV === correctV) {
                     totalCorrect++;
                     (userV ? btnT : btnF).className = "flex-1 py-4 rounded-[18px] bg-green-600 text-white font-black uppercase text-xs tracking-widest";
                 } else {
                     (userV ? btnT : btnF).className = "flex-1 py-4 rounded-[18px] bg-red-600 text-white font-black uppercase text-xs tracking-widest";
                 }
-
                 if (currentSubjAnswered >= sessionSubjects[currentSubjectIndex].qCount) {
                     document.getElementById('next-subject-flow').classList.remove('hidden');
                 }
@@ -307,11 +325,9 @@
 
         function finishSession() {
             globalEndTime = Date.now();
-            const totalDurationMs = globalEndTime - globalStartTime;
-            const totalSeconds = Math.floor(totalDurationMs / 1000);
+            const totalSeconds = Math.floor((globalEndTime - globalStartTime) / 1000);
             const totalMinutes = (totalSeconds / 60).toFixed(1);
-            
-            const accuracy = ((totalCorrect / totalQuestionsAttempted) * 100).toFixed(1);
+            const accuracy = totalQuestionsAttempted > 0 ? ((totalCorrect / totalQuestionsAttempted) * 100).toFixed(1) : 0;
             const avgTimePerQ = totalQuestionsAttempted > 0 ? (totalSeconds / totalQuestionsAttempted).toFixed(0) : 0;
 
             document.getElementById('stat-accuracy').textContent = `${accuracy}%`;
@@ -331,9 +347,7 @@
             currentSubjectIndex++;
             if (currentSubjectIndex < sessionSubjects.length) {
                 startNextSubject();
-            } else {
-                finishSession();
-            }
+            } else { finishSession(); }
         });
 
         document.getElementById('skip-subject-btn').addEventListener('click', () => {
@@ -341,9 +355,7 @@
                 currentSubjectIndex++;
                 if (currentSubjectIndex < sessionSubjects.length) {
                     startNextSubject();
-                } else {
-                    finishSession();
-                }
+                } else { finishSession(); }
             }
         });
 
