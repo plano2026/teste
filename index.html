@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Si Vis Pacem - Foco e Performance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --light-bg: #f8fafc; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--light-bg); color: #1e293b; }
+        .glass-card { background: #ffffff; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        input, select { border: 1px solid #cbd5e1; transition: all 0.2s; }
+        input:focus, select:focus { border-color: #4f46e5; outline: none; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+        .subject-badge { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="min-h-screen transition-colors duration-300">
+
+    <nav class="w-full p-4 flex justify-between items-center glass-card sticky top-0 z-50">
+        <div class="flex items-center space-x-2">
+            <div class="w-3 h-3 bg-indigo-600 rounded-full"></div>
+            <span class="font-extrabold text-xl tracking-tighter text-indigo-700">SI VIS PACEM</span>
+        </div>
+        <div id="user-status" class="text-xs font-bold text-slate-500 uppercase tracking-widest">Sessão Ativa</div>
+    </nav>
+
+    <main class="container mx-auto max-w-4xl p-4 md:p-6">
+        
+        <!-- Setup Section -->
+        <section id="setup-section" class="glass-card p-6 md:p-10 rounded-[32px] mb-8">
+            <h1 class="text-3xl font-black mb-1 text-slate-900">Configurar Simulado</h1>
+            <p class="text-slate-500 text-sm mb-8">Monte seu treino. O tempo será contabilizado ao final para sua análise.</p>
+            
+            <div class="space-y-8">
+                <!-- Plano Nome -->
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-tight">Nome do Simulado</label>
+                    <input type="text" id="plan-name" placeholder="Ex: Simulado Geral - PM SC" class="w-full p-4 rounded-2xl bg-slate-50 text-lg font-medium">
+                </div>
+
+                <!-- Disciplinas Builder -->
+                <div class="p-6 bg-slate-50 rounded-[24px] border border-slate-200">
+                    <label class="block text-sm font-bold text-slate-700 mb-4 uppercase tracking-tight">Adicionar Disciplinas</label>
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 mb-4">
+                        <div class="md:col-span-8">
+                            <select id="subject-dropdown" class="w-full p-4 rounded-xl bg-white text-sm font-medium">
+                                <option value="" disabled selected>Escolha a Disciplina...</option>
+                                <optgroup label="Direito">
+                                    <option value="Direito Penal">Direito Penal</option>
+                                    <option value="Direito Processual Penal">Direito Processual Penal</option>
+                                    <option value="Direito Administrativo">Direito Administrativo</option>
+                                    <option value="Direito Constitucional">Direito Constitucional</option>
+                                    <option value="Direitos Humanos">Direitos Humanos</option>
+                                </optgroup>
+                                <optgroup label="Básicas">
+                                    <option value="Língua Portuguesa">Língua Portuguesa</option>
+                                    <option value="Raciocínio Lógico">Raciocínio Lógico</option>
+                                    <option value="Informática">Informática</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="md:col-span-3">
+                            <input type="number" id="new-subject-qcount" placeholder="Questões" min="1" max="10" value="5" class="w-full p-4 rounded-xl bg-white text-center font-bold">
+                        </div>
+                        <div class="md:col-span-1">
+                            <button id="add-subject-btn" class="w-full h-full bg-indigo-600 text-white rounded-xl font-black text-xl hover:bg-indigo-700 transition">+</button>
+                        </div>
+                    </div>
+                    <div id="subjects-list" class="flex flex-wrap gap-2 min-h-[40px]">
+                        <!-- Badges -->
+                    </div>
+                </div>
+
+                <button id="start-session-btn" class="w-full py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[24px] font-black text-xl shadow-2xl shadow-indigo-100 transition-all active:scale-[0.98]">
+                    INICIAR SIMULADO
+                </button>
+            </div>
+        </section>
+
+        <!-- Active Study Session -->
+        <section id="study-section" class="hidden space-y-6">
+            <!-- Simplified Header (No Timer) -->
+            <div class="glass-card p-6 rounded-[32px] border-b-4 border-indigo-500 flex justify-between items-center">
+                <div>
+                    <span id="current-subject-badge" class="px-5 py-1.5 bg-indigo-600 text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em]">EM EXECUÇÃO</span>
+                    <h2 id="current-task-title" class="text-2xl font-black mt-2 text-slate-900 leading-none">Disciplina Ativa</h2>
+                </div>
+                <button id="skip-subject-btn" class="px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition">Pular Disciplina</button>
+            </div>
+
+            <div class="flex justify-between items-center px-4">
+                <h3 class="font-black text-slate-800 uppercase tracking-tight text-lg">Questões de <span id="ia-subject-label" class="text-indigo-600"></span></h3>
+                <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-lg">Foco Total</div>
+            </div>
+
+            <div id="questions-area" class="space-y-6">
+                <!-- AI Questions -->
+            </div>
+            
+            <!-- Flow Controls -->
+            <div id="next-subject-flow" class="hidden p-8 text-center bg-indigo-50 rounded-[32px] border-2 border-dashed border-indigo-200">
+                <h4 class="text-xl font-black text-indigo-900 mb-2">Disciplina Concluída!</h4>
+                <p class="text-indigo-600 text-sm mb-6">Você respondeu todas as questões desta etapa.</p>
+                <button id="next-subject-btn-inline" class="px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl hover:bg-indigo-700 transition">IR PARA PRÓXIMA ETAPA ⮕</button>
+            </div>
+
+            <div id="loading-questions" class="hidden p-16 text-center">
+                <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="font-black text-slate-400 text-xs uppercase tracking-[0.2em]">Gerando questões inéditas...</p>
+            </div>
+        </section>
+
+        <!-- Performance Modal -->
+        <div id="modal-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white p-10 rounded-[48px] max-w-lg w-full shadow-2xl text-center transform transition-all scale-95 opacity-0" id="motivational-modal">
+                <div class="text-6xl mb-6">📊</div>
+                <h3 class="text-3xl font-black text-slate-900 mb-2">Relatório de Combate</h3>
+                <p class="text-slate-500 text-sm mb-8 leading-relaxed" id="modal-message">Análise detalhada do seu desempenho nesta sessão.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div class="p-5 bg-indigo-50 rounded-[24px] border border-indigo-100">
+                        <span class="block text-2xl font-black text-indigo-600" id="stat-accuracy">0%</span>
+                        <span class="text-[9px] uppercase font-black text-slate-400 tracking-widest">Acerto Geral</span>
+                    </div>
+                    <div class="p-5 bg-slate-50 rounded-[24px] border border-slate-100">
+                        <span class="block text-2xl font-black text-slate-900" id="stat-total-time">0m</span>
+                        <span class="text-[9px] uppercase font-black text-slate-400 tracking-widest">Tempo Total</span>
+                    </div>
+                    <div class="p-5 bg-slate-50 rounded-[24px] border border-slate-100">
+                        <span class="block text-2xl font-black text-indigo-600" id="stat-avg-time">0s</span>
+                        <span class="text-[9px] uppercase font-black text-slate-400 tracking-widest">Média por Questão</span>
+                    </div>
+                </div>
+
+                <button id="modal-close-btn" class="w-full py-5 bg-indigo-600 text-white rounded-[24px] font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition">VOLTAR AO INÍCIO</button>
+            </div>
+        </div>
+
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'simulado-combat-v1';
+
+        let user = null;
+        let globalStartTime = null;
+        let globalEndTime = null;
+        let currentSubjectIndex = 0;
+        let sessionSubjects = [];
+        let userDefinedSubjects = [];
+        
+        // Cumulative stats
+        let totalCorrect = 0;
+        let totalQuestionsAttempted = 0;
+        let currentSubjAnswered = 0;
+
+        // API Key configurada conforme solicitado
+        const apiKey = "AIzaSyBkPMKVAI_Jh-ZJ6h4AEUuP9W990ItqLxk"; 
+
+        // Auth init
+        const initAuth = async () => {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
+            }
+        };
+        onAuthStateChanged(auth, u => { user = u; });
+        initAuth();
+
+        // UI Management
+        document.getElementById('add-subject-btn').addEventListener('click', () => {
+            const name = document.getElementById('subject-dropdown').value;
+            const qCount = parseInt(document.getElementById('new-subject-qcount').value) || 5;
+            
+            if (name) {
+                if(userDefinedSubjects.some(s => s.name === name)) {
+                    alert("Esta disciplina já foi adicionada.");
+                    return;
+                }
+                userDefinedSubjects.push({ name, qCount });
+                renderSubjectBadges();
+            } else {
+                alert("Selecione uma disciplina.");
+            }
+        });
+
+        function renderSubjectBadges() {
+            const list = document.getElementById('subjects-list');
+            list.innerHTML = '';
+            userDefinedSubjects.forEach((s, idx) => {
+                const div = document.createElement('div');
+                div.className = "subject-badge px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-3 shadow-sm";
+                div.innerHTML = `
+                    <span>${s.name} <span class="text-indigo-600 ml-1">(${s.qCount} questões)</span></span>
+                    <button onclick="window.removeSubject(${idx})" class="w-5 h-5 flex items-center justify-center bg-slate-100 text-slate-400 rounded-full hover:bg-red-500 hover:text-white transition">×</button>
+                `;
+                list.appendChild(div);
+            });
+        }
+        window.removeSubject = (idx) => { userDefinedSubjects.splice(idx, 1); renderSubjectBadges(); };
+
+        // Session Control
+        document.getElementById('start-session-btn').addEventListener('click', () => {
+            if (userDefinedSubjects.length === 0) {
+                alert("Adicione ao menos uma disciplina para começar.");
+                return;
+            }
+
+            sessionSubjects = [...userDefinedSubjects];
+            globalStartTime = Date.now();
+            totalCorrect = 0;
+            totalQuestionsAttempted = 0;
+
+            document.getElementById('setup-section').classList.add('hidden');
+            document.getElementById('study-section').classList.remove('hidden');
+            
+            currentSubjectIndex = 0;
+            startNextSubject();
+        });
+
+        function startNextSubject() {
+            const subj = sessionSubjects[currentSubjectIndex];
+            document.getElementById('current-task-title').textContent = subj.name;
+            document.getElementById('ia-subject-label').textContent = subj.name;
+            document.getElementById('next-subject-flow').classList.add('hidden');
+            
+            currentSubjAnswered = 0;
+            fetchAIQuestions(subj.name, subj.qCount);
+        }
+
+        async function fetchAIQuestions(subject, count) {
+            const container = document.getElementById('questions-area');
+            const loading = document.getElementById('loading-questions');
+            loading.classList.remove('hidden');
+            container.innerHTML = '';
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: `Gere ${count} questões de Certo/Errado para concurso público sobre "${subject}". Retorne apenas JSON puro: [{"q":"texto","a":true/false,"r":"explicacao"}]` }] }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+                const data = await response.json();
+                const qs = JSON.parse(data.candidates[0].content.parts[0].text);
+                loading.classList.add('hidden');
+                
+                qs.forEach((q, i) => {
+                    const card = document.createElement('div');
+                    card.className = "glass-card p-6 md:p-8 rounded-[28px] border-l-[12px] border-indigo-600 shadow-sm";
+                    card.innerHTML = `
+                        <p class="text-slate-900 font-bold text-lg mb-8 leading-relaxed">${i+1}. ${q.q}</p>
+                        <div class="flex gap-4">
+                            <button id="q-${i}-t" onclick="window.checkAns(${i}, true, ${q.a}, '${q.r}')" class="flex-1 py-4 rounded-[18px] bg-slate-100 font-black text-slate-700 hover:bg-indigo-600 hover:text-white transition uppercase text-xs tracking-widest">Certo</button>
+                            <button id="q-${i}-f" onclick="window.checkAns(${i}, false, ${q.a}, '${q.r}')" class="flex-1 py-4 rounded-[18px] bg-slate-100 font-black text-slate-700 hover:bg-red-600 hover:text-white transition uppercase text-xs tracking-widest">Errado</button>
+                        </div>
+                        <div id="res-${i}" class="hidden mt-6 p-5 bg-indigo-50 rounded-[20px] text-sm font-medium text-slate-700 border border-indigo-100">
+                            <span class="block font-black text-indigo-600 mb-1 uppercase text-[10px] tracking-widest">Explicação:</span> ${q.r}
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (e) {
+                loading.classList.add('hidden');
+                container.innerHTML = `<p class="p-8 text-center text-red-500 font-bold">Falha ao carregar questões. Tente recarregar.</p>`;
+            }
+        }
+
+        window.checkAns = (i, userV, correctV, reason) => {
+            const res = document.getElementById(`res-${i}`);
+            const btnT = document.getElementById(`q-${i}-t`);
+            const btnF = document.getElementById(`q-${i}-f`);
+            
+            if (res.classList.contains('hidden')) {
+                res.classList.remove('hidden');
+                btnT.disabled = btnF.disabled = true;
+                
+                totalQuestionsAttempted++;
+                currentSubjAnswered++;
+                
+                if (userV === correctV) {
+                    totalCorrect++;
+                    (userV ? btnT : btnF).className = "flex-1 py-4 rounded-[18px] bg-green-600 text-white font-black uppercase text-xs tracking-widest";
+                } else {
+                    (userV ? btnT : btnF).className = "flex-1 py-4 rounded-[18px] bg-red-600 text-white font-black uppercase text-xs tracking-widest";
+                }
+
+                if (currentSubjAnswered >= sessionSubjects[currentSubjectIndex].qCount) {
+                    document.getElementById('next-subject-flow').classList.remove('hidden');
+                }
+            }
+        };
+
+        function finishSession() {
+            globalEndTime = Date.now();
+            const totalDurationMs = globalEndTime - globalStartTime;
+            const totalSeconds = Math.floor(totalDurationMs / 1000);
+            const totalMinutes = (totalSeconds / 60).toFixed(1);
+            
+            const accuracy = ((totalCorrect / totalQuestionsAttempted) * 100).toFixed(1);
+            const avgTimePerQ = totalQuestionsAttempted > 0 ? (totalSeconds / totalQuestionsAttempted).toFixed(0) : 0;
+
+            document.getElementById('stat-accuracy').textContent = `${accuracy}%`;
+            document.getElementById('stat-total-time').textContent = `${totalMinutes}m`;
+            document.getElementById('stat-avg-time').textContent = `${avgTimePerQ}s`;
+
+            const overlay = document.getElementById('modal-overlay');
+            const modal = document.getElementById('motivational-modal');
+            overlay.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.replace('scale-95', 'scale-100');
+                modal.classList.replace('opacity-0', 'opacity-100');
+            }, 10);
+        }
+
+        document.getElementById('next-subject-btn-inline').addEventListener('click', () => {
+            currentSubjectIndex++;
+            if (currentSubjectIndex < sessionSubjects.length) {
+                startNextSubject();
+            } else {
+                finishSession();
+            }
+        });
+
+        document.getElementById('skip-subject-btn').addEventListener('click', () => {
+            if (confirm("Deseja pular esta disciplina?")) {
+                currentSubjectIndex++;
+                if (currentSubjectIndex < sessionSubjects.length) {
+                    startNextSubject();
+                } else {
+                    finishSession();
+                }
+            }
+        });
+
+        document.getElementById('modal-close-btn').addEventListener('click', () => {
+            window.location.reload();
+        });
+
+    </script>
+</body>
+</html>
